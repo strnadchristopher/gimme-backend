@@ -1,0 +1,7 @@
+pip==21.3.1
+cryptography==3.3.2
+selenium==4.0.0
+magnet2torrent==1.2.1
+qbittorrent-api==2024.3.60
+fastapi==0.110.3
+uvicorn[standard]==0.29.0
