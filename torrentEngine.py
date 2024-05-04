@@ -41,16 +41,6 @@ def get_torrents_info(client):
 
 
 def search_for_movie(movie_title, client=None):
-    # We need to pause all the torrents before we start searching for a new movie, as our platform cannot handle doing both for some reason
-    # paused_torrents = []
-    # if client is not None:
-    #     for torrent in client.torrents_info():
-    #         client.torrents_pause(torrent.hash)
-    #         paused_torrents.append(torrent.hash)
-    
-    # Sleep for 5 seconds so the torrents can pause
-    time.sleep(5)
-            
     # We need to url encode the movie title, meaning we replace spaces with + signs
     import urllib.parse
     
@@ -61,11 +51,6 @@ def search_for_movie(movie_title, client=None):
     qhd_torrents = get_torrents_list(movie_title, QUALITY_4K)
     print("Found torrents: " + str(len(qhd_torrents)) + " for movie: " + movie_title + " with quality: 4K", flush=True)
     found_torrents += qhd_torrents
-    
-    # print("Searching for movie: " + movie_title + " with quality: 1080P", flush=True)
-    # hd_torrents = get_torrents_list(movie_title, QUALITY_1080P)
-    # print("Found torrents: " + str(len(hd_torrents)) + " for movie: " + movie_title + " with quality: 1080P", flush=True)
-    # found_torrents += hd_torrents
     
     print("Found a total of " + str(len(found_torrents)) + " torrents for movie: " + movie_title, flush=True)
     # Sort the torrents by seeder count
@@ -79,7 +64,8 @@ def search_for_movie(movie_title, client=None):
     
 
 def get_torrents_list(movie_title, quality):
-    dest_url = f'https://thepiratebay.org/search.php?q={movie_title}&all=on&search=Pirate+Search&page=0&orderby=&cat=0'
+    # dest_url = f'https://thepiratebay.org/search.php?q={movie_title}&all=on&search=Pirate+Search&page=0&orderby=&cat=0'
+    dest_url = f'https://thepiratebay.org/search.php?q={movie_title}&all=on&search=Pirate+Search&page=0&orderby='
     # Attempt to load the page and gather data on torrents
     try:
         driver.get(dest_url)
@@ -92,7 +78,7 @@ def get_torrents_list(movie_title, quality):
     if len(results) == 0:
         print("No results found for: " + movie_title + " with quality: " + quality)
         return []
-    results = results[0:5]
+    results = results[0:20]
     # If we find any, we want to print the href of the child <a> tag of the child <span> with class name "list-item" "item-name" and "item-title" of each result
     choices = []
     for result in results:
