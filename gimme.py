@@ -19,7 +19,7 @@ def start():
 def server_mode():
     import subprocess
     print("Starting in server mode...", flush=True)
-    subprocess.run("uvicorn main:app --reload --host 0.0.0.0 --port 6970", shell = True, executable="/bin/bash")
+    subprocess.run("uvicorn main:app --reload --host 0.0.0.0 --port 6970", shell = True)
 
 
 def cli_mode(search_query=None):

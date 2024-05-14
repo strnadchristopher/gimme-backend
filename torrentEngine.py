@@ -1,6 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 import asyncio
+import json
 import time
 from qbittorrentapi import Client, TorrentState
 chrome_options = webdriver.ChromeOptions()
@@ -29,14 +30,14 @@ def get_torrents_info(client):
                 # We need to convert torrent_eta to a human readable format, its in milliseconds and should be converted to hours, minutes, seconds
                 currently_downloading.append(torrent_properties)
     # Sort queued_to_download by priority, which is it's 
-    print("==========================", flush=True)
-    for torrent in currently_downloading:
-        print("Currently downloading: " + torrent["name"] +
-              " ETA: " + str(time.strftime('%H:%M:%S', time.gmtime(torrent["eta"]))), flush=True)
-    print("==========================", flush=True)
-    for torrent in queued_to_download:
-        print("Queued to download: " + torrent["name"], flush=True)
-    print("\n\n", flush=True)
+    # print("==========================", flush=True)
+    # for torrent in currently_downloading:
+    #     print("Currently downloading: " + torrent["name"] +
+    #           " ETA: " + str(time.strftime('%H:%M:%S', time.gmtime(torrent["eta"]))), flush=True)
+    # print("==========================", flush=True)
+    # for torrent in queued_to_download:
+    #     print("Queued to download: " + torrent["name"], flush=True)
+    # print("\n\n", flush=True)
     return {"currently_downloading": currently_downloading, "queued_to_download": queued_to_download}
 
 
@@ -108,3 +109,51 @@ def resume_torrent(torrent_hash, client):
 def download_movie(magnet_link, client):
     dl_path = '/mnt/coldstorage/permafrost/Movies/'
     client.torrents_add(urls=magnet_link, save_path=dl_path)
+
+# These functions open the owned_movies.json file and add or remove a movie id from the list, and then overwrite the file with the new list, and then return the list
+def add_to_owned_list(movie_id):
+    with open("owned_movies.json", "r") as file:
+        owned_movies = json.load(file)
+    # Close the file
+    file.close()
+    owned_movies.append(movie_id)
+    with open("owned_movies.json", "w") as file:
+        json.dump(owned_movies, file)
+    # Close the file
+    file.close()
+    return owned_movies
+
+def remove_from_owned_list(movie_id):
+    with open("owned_movies.json", "r") as file:
+        owned_movies = json.load(file)
+    # Close the file
+    file.close()
+    owned_movies.remove(movie_id)
+    with open("owned_movies.json", "w") as file:
+        json.dump(owned_movies, file)
+    # Close the file
+    file.close()
+    return owned_movies
+
+def update_owned_list(movie_id):
+    with open("owned_movies.json", "r") as file:
+        owned_movies = json.load(file)
+    # Close the file
+    file.close()
+    if movie_id in owned_movies:
+        owned_movies.remove(movie_id)
+    else:
+        owned_movies.append(movie_id)
+    with open("owned_movies.json", "w") as file:
+        json.dump(owned_movies, file)
+    # Close the file
+    file.close()
+    return owned_movies
+
+def get_owned_list():
+    import json
+    with open("owned_movies.json", "r") as file:
+        owned_movies = json.load(file)
+    # Close the file
+    file.close()
+    return owned_movies
