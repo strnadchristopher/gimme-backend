@@ -4,14 +4,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from qbittorrentapi import Client
+from fastapi.staticfiles import StaticFiles
+
 client = Client(
     host="http://192.168.1.144:8080",
     username="admin",
     password="adminadmin"
 )
 app = FastAPI()
-class DownloadRequest(BaseModel):
-    magnet: str
+
 origins = [
     "http://localhost.tiangolo.com",
     "https://localhost.tiangolo.com",
@@ -30,20 +31,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Endpoint to get current torrent queue
 @app.get("/torrents")
 def get_torrents():
     return torrentEngine.get_torrents_info(client)
 
-@app.get("/search/{movie_name}")
-def request_search(movie_name: str):
-    return torrentEngine.search_for_movie(movie_name, client)
+@app.get("/search/{movie_name}/{page}")
+def request_search(movie_name: str, page: int):
+    return torrentEngine.search_for_movie(movie_name, page, client)
 
+class DownloadRequest(BaseModel):
+    magnet: str
+    media_type: str
+    movie_name: str
+    
 @app.post("/download/")
-def request_download(magnet_link: DownloadRequest):
-    print(magnet_link.magnet)
+def request_download(download_request: DownloadRequest):
+    print(download_request)
     # print("Downloading movie with magnet link: " + magnet_link)
-    return torrentEngine.download_movie(magnet_link.magnet, client)
+    return torrentEngine.download_movie(download_request, client)
 
 class ResumeRequest(BaseModel):
     torrent_hash: str

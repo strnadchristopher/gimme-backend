@@ -41,7 +41,7 @@ def get_torrents_info(client):
     return {"currently_downloading": currently_downloading, "queued_to_download": queued_to_download}
 
 
-def search_for_movie(movie_title, client=None):
+def search_for_movie(movie_title, page, client=None):
     # We need to url encode the movie title, meaning we replace spaces with + signs
     import urllib.parse
     
@@ -49,7 +49,7 @@ def search_for_movie(movie_title, client=None):
     found_torrents = []
     
     print("Searching for movie: " + movie_title + " with quality: 4K", flush=True)
-    qhd_torrents = get_torrents_list(movie_title, QUALITY_4K)
+    qhd_torrents = get_torrents_list(movie_title, page, QUALITY_4K)
     print("Found torrents: " + str(len(qhd_torrents)) + " for movie: " + movie_title + " with quality: 4K", flush=True)
     found_torrents += qhd_torrents
     
@@ -64,9 +64,9 @@ def search_for_movie(movie_title, client=None):
     return found_torrents
     
 
-def get_torrents_list(movie_title, quality):
+def get_torrents_list(movie_title, page, quality):
     # dest_url = f'https://thepiratebay.org/search.php?q={movie_title}&all=on&search=Pirate+Search&page=0&orderby=&cat=0'
-    dest_url = f'https://thepiratebay.org/search.php?q={movie_title}&all=on&search=Pirate+Search&page=0&orderby='
+    dest_url = f'https://thepiratebay.org/search.php?q={movie_title}&all=on&search=Pirate+Search&page={page}&orderby='
     # Attempt to load the page and gather data on torrents
     try:
         driver.get(dest_url)
@@ -79,7 +79,7 @@ def get_torrents_list(movie_title, quality):
     if len(results) == 0:
         print("No results found for: " + movie_title + " with quality: " + quality)
         return []
-    results = results[0:20]
+    # results = results[0:20]
     # If we find any, we want to print the href of the child <a> tag of the child <span> with class name "list-item" "item-name" and "item-title" of each result
     choices = []
     for result in results:
@@ -106,9 +106,18 @@ def resume_torrent(torrent_hash, client):
     client.torrents_top_priority(torrent_hash)
     
 
-def download_movie(magnet_link, client):
-    dl_path = '/mnt/coldstorage/permafrost/Movies/'
-    client.torrents_add(urls=magnet_link, save_path=dl_path)
+def download_movie(download_request, client):
+    # Download Request will contain a magnet link, a media type, and a movie name
+    # If the media_type is "movie" then we will download the movie to the Movies folder
+    # If the media_type is "tv" then we will download the show to the Tv folder
+    dl_path_base = '/mnt/coldstorage/permafrost/'
+    if download_request.media_type == "movie":
+        dl_path = dl_path_base + "Movies"
+    elif download_request.media_type == "tv":
+        dl_path = dl_path_base + "TV"
+    # Then add the movie name to the path at the end
+    dl_path += "/" + download_request.movie_name
+    client.torrents_add(urls=download_request.magnet, save_path=dl_path)
 
 # These functions open the owned_movies.json file and add or remove a movie id from the list, and then overwrite the file with the new list, and then return the list
 def add_to_owned_list(movie_id):
