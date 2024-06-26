@@ -7,7 +7,7 @@ from qbittorrentapi import Client
 from fastapi.staticfiles import StaticFiles
 
 client = Client(
-    host="http://192.168.1.144:8080",
+    host="http://192.168.1.217:8080",
     username="admin",
     password="adminadmin"
 )
@@ -25,7 +25,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=['*'],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,7 +45,8 @@ class DownloadRequest(BaseModel):
     magnet: str
     media_type: str
     movie_name: str
-    
+
+@app.post("/download")
 @app.post("/download/")
 def request_download(download_request: DownloadRequest):
     print(download_request)

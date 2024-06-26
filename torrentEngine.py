@@ -110,11 +110,16 @@ def download_movie(download_request, client):
     # Download Request will contain a magnet link, a media type, and a movie name
     # If the media_type is "movie" then we will download the movie to the Movies folder
     # If the media_type is "tv" then we will download the show to the Tv folder
-    dl_path_base = '/mnt/coldstorage/permafrost/'
-    if download_request.media_type == "movie":
+    print("Downloading movie: " + download_request.movie_name, flush=True)
+    print(download_request, flush=True)
+    dl_path_base = '/mnt/WarmStorage/Media/'
+    dl_path = ""
+    if download_request.media_type == "movie" or download_request.media_type == "movies":
         dl_path = dl_path_base + "Movies"
     elif download_request.media_type == "tv":
         dl_path = dl_path_base + "TV"
+    else:
+        dl_path = dl_path_base + "Other"
     # Then add the movie name to the path at the end
     dl_path += "/" + download_request.movie_name
     client.torrents_add(urls=download_request.magnet, save_path=dl_path)

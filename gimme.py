@@ -19,14 +19,31 @@ def start():
 def server_mode():
     import subprocess
     print("Starting in server mode...", flush=True)
-    subprocess.run("uvicorn main:app --reload --host 0.0.0.0 --port 6970", shell = True)
+    ssl_command = [
+        "uvicorn",
+        "main:app",  # Assuming your FastAPI instance is in main.py and called app
+        "--reload",  # Auto-reload when code changes
+        "--host", "0.0.0.0",
+        "--port", "6970",
+        "--ssl-keyfile", "keys/key.pem",
+        "--ssl-certfile", "keys/cert.pem"
+    ]
+    command = [
+        "uvicorn",
+        "main:app",  # Assuming your FastAPI instance is in main.py and called app
+        "--reload",  # Auto-reload when code changes
+        "--host", "0.0.0.0",
+        "--port", "6970",
+    ]
+    subprocess.run(command)
+    # subprocess.run("uvicorn main:app --reload --host 0.0.0.0 --port 6970 --ssl-keyfile keys/key.pem --", shell = True)
 
 
 def cli_mode(search_query=None):
     # Create QBitTorrentClient
     from qbittorrentapi import Client
     client = Client(
-        host="http://192.168.1.144:8080",
+        host="http://192.168.1.217:8080",
         username="admin",
         password="adminadmin"
     )
