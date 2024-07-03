@@ -35,7 +35,7 @@ def server_mode():
         "--host", "0.0.0.0",
         "--port", "6970",
     ]
-    subprocess.run(command)
+    subprocess.run(ssl_command)
     # subprocess.run("uvicorn main:app --reload --host 0.0.0.0 --port 6970 --ssl-keyfile keys/key.pem --", shell = True)
 
 
