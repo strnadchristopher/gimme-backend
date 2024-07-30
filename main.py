@@ -7,7 +7,7 @@ from qbittorrentapi import Client
 from fastapi.staticfiles import StaticFiles
 
 client = Client(
-    host="http://192.168.1.217:8080",
+    host="http://192.168.1.144:8080",
     username="admin",
     password="adminadmin"
 )
@@ -85,7 +85,17 @@ class UpdateOwnedListRequest(BaseModel):
 def update_owned_list(update_owned_list_request: UpdateOwnedListRequest):
     new_list = torrentEngine.update_owned_list(update_owned_list_request.movie_id)
     return new_list
-    
+
 @app.get("/api/owned_list")
 def get_owned_list():
     return torrentEngine.get_owned_list()
+
+class UpdatePreviousMagnetListRequest(BaseModel):
+    magnet: str
+@app.post("/api/update_previous_magnet_list")
+def update_previous_magnet_list(update_previous_magnet_list_request: UpdatePreviousMagnetListRequest):
+    new_list = torrentEngine.update_previous_magnet_list(update_previous_magnet_list_request.magnet)
+    return new_list
+@app.get("/api/previous_magnet_list")
+def get_previous_magnet_list():
+    return torrentEngine.get_previous_magnet_list()

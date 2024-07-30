@@ -7,6 +7,7 @@ from qbittorrentapi import Client, TorrentState
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--no-sandbox')
 chrome_options.add_argument('--headless')
+chrome_options.add_argument('--proxy-server=192.168.1.144:48781')
 driver = webdriver.Chrome(options=chrome_options)
 driver.implicitly_wait(10)
 QUALITY_4K = "211"
@@ -44,7 +45,8 @@ def get_torrents_info(client):
 def search_for_movie(movie_title, page, client=None):
     # We need to url encode the movie title, meaning we replace spaces with + signs
     import urllib.parse
-    
+    # remove any single quotes, double quotes, and asterisks
+    movie_title = movie_title.replace("'", "").replace('"', "").replace("*", "")
     movie_title = urllib.parse.quote(movie_title)
     found_torrents = []
     
@@ -67,6 +69,7 @@ def search_for_movie(movie_title, page, client=None):
 def get_torrents_list(movie_title, page, quality):
     # dest_url = f'https://thepiratebay.org/search.php?q={movie_title}&all=on&search=Pirate+Search&page=0&orderby=&cat=0'
     dest_url = f'https://thepiratebay.org/search.php?q={movie_title}&all=on&search=Pirate+Search&page={page}&orderby='
+    print("Attempting to load page: " + dest_url, flush=True)
     # Attempt to load the page and gather data on torrents
     try:
         driver.get(dest_url)
@@ -101,18 +104,13 @@ def get_torrents_list(movie_title, page, quality):
                         "magnet": magnet_link, "seeder_count": seeder_count})
     return choices
     
-def resume_torrent(torrent_hash, client):
-    print("Attempting to resume torrent: " + torrent_hash, flush=True)
-    client.torrents_top_priority(torrent_hash)
-    
-
 def download_movie(download_request, client):
     # Download Request will contain a magnet link, a media type, and a movie name
     # If the media_type is "movie" then we will download the movie to the Movies folder
     # If the media_type is "tv" then we will download the show to the Tv folder
     print("Downloading movie: " + download_request.movie_name, flush=True)
     print(download_request, flush=True)
-    dl_path_base = '/mnt/WarmStorage/Media/'
+    dl_path_base = '/mnt/FrostStorageShare/Media/'
     dl_path = ""
     if download_request.media_type == "movie" or download_request.media_type == "movies":
         dl_path = dl_path_base + "Movies"
@@ -123,6 +121,10 @@ def download_movie(download_request, client):
     # Then add the movie name to the path at the end
     dl_path += "/" + download_request.movie_name
     client.torrents_add(urls=download_request.magnet, save_path=dl_path)
+
+def resume_torrent(torrent_hash, client):
+    print("Attempting to resume torrent: " + torrent_hash, flush=True)
+    client.torrents_top_priority(torrent_hash)
 
 # These functions open the owned_movies.json file and add or remove a movie id from the list, and then overwrite the file with the new list, and then return the list
 def add_to_owned_list(movie_id):
@@ -171,3 +173,22 @@ def get_owned_list():
     # Close the file
     file.close()
     return owned_movies
+
+def update_previous_magnet_list(magnet):
+    with open("previous_magnet_list.json", "r") as file:
+        previous_magnet_list = json.load(file)
+    # Close the file
+    file.close()
+    previous_magnet_list.append(magnet)
+    with open("previous_magnet_list.json", "w") as file:
+        json.dump(previous_magnet_list, file)
+    # Close the file
+    file.close()
+    return previous_magnet_list
+
+def get_previous_magnet_list():
+    with open("previous_magnet_list.json", "r") as file:
+        previous_magnet_list = json.load(file)
+    # Close the file
+    file.close()
+    return previous_magnet_list
