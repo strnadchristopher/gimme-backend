@@ -1,23 +1,11 @@
-# VERSION: 0.07
-# AUTHORS: nindogo (nindogo@gmail.com)
-
-# LICENSING INFORMATION
-
-import re
 import math
-import threading
-from helpers import retrieve_url
-from novaprinter import prettyPrinter
-# some other imports if necessary
-try:
-    # Python 3
-    from html.parser import HTMLParser
-except ImportError:
-    # Python 2
-    from HTMLParser import HTMLParser
+import re
+import requests
+import urllib.parse
+from html.parser import HTMLParser
+from prettyprinter import pprint
 
-
-class torrentgalaxy(object):
+class torrentgalaxy:
     url = 'https://torrentgalaxy.to/'
     name = 'TorrentGalaxy'
     supported_categories = {
@@ -33,29 +21,31 @@ class torrentgalaxy(object):
     }
 
     class TorrentGalaxyParser(HTMLParser):
-        DIV, A, SPAN, FONT, SMALL, = 'div', 'a', 'span', 'font', 'small'
-        count_div, = -1,
+        DIV, A, SPAN, FONT, SMALL = 'div', 'a', 'span', 'font', 'small'
+        count_div = -1
         get_size, get_seeds, get_leechs = False, False, False
-        this_record = {}
-        url = 'https://torrentgalaxy.to'
+
+        def __init__(self, url):
+            super().__init__()
+            self.url = url
+            self.this_record = {}
+            self.results = []
 
         def handle_starttag(self, tag, attrs):
             if tag == self.DIV:
                 my_attrs = dict(attrs)
-                # if (my_attrs.get('class') == 'tgxtablerow txlight'):
-                if  my_attrs.get('class') and 'tgxtablerow' in my_attrs.get('class'):
+                if my_attrs.get('class') and 'tgxtablerow' in my_attrs.get('class'):
                     self.count_div = 0
                     self.this_record = {}
                     self.this_record['engine_url'] = self.url
-                if  my_attrs.get('class') and ('tgxtablecell' in my_attrs.get('class')) and self.count_div >= 0:
+                if my_attrs.get('class') and 'tgxtablecell' in my_attrs.get('class') and self.count_div >= 0:
                     self.count_div += 1
 
             if tag == self.A and self.count_div < 13:
                 my_attrs = dict(attrs)
-                if 'title' in my_attrs and ('class' in my_attrs) and 'txlight' in my_attrs.get('class') and not my_attrs.get('id'):
+                if 'title' in my_attrs and 'class' in my_attrs and 'txlight' in my_attrs.get('class') and not my_attrs.get('id'):
                     self.this_record['name'] = my_attrs['title']
-                    self.this_record['desc_link'] = \
-                        self.url + my_attrs['href']
+                    self.this_record['desc_link'] = self.url + my_attrs['href']
                 if 'role' in my_attrs and my_attrs.get('role') == 'button':
                     self.this_record['link'] = my_attrs['href']
 
@@ -72,54 +62,69 @@ class torrentgalaxy(object):
                     self.get_leechs = True
 
             if self.count_div == 13 and tag == self.SMALL:
-                prettyPrinter(self.this_record)
+                self.results.append(self.this_record)
                 self.this_record = {}
                 self.count_div = -1
 
         def handle_data(self, data):
-            if self.get_size is True and self.count_div < 13:
+            if self.get_size and self.count_div < 13:
                 self.this_record['size'] = data.strip().replace(',', '')
                 self.get_size = False
-            if self.get_seeds is True:
+            if self.get_seeds:
                 self.this_record['seeds'] = data.strip().replace(',', '')
                 self.get_seeds = False
-            if self.get_leechs is True:
+            if self.get_leechs:
                 self.this_record['leech'] = data.strip().replace(',', '')
                 self.get_leechs = False
 
-    def do_search(self, url):
-        webpage = retrieve_url(url)
-        tgParser = self.TorrentGalaxyParser()
-        tgParser.feed(webpage)
+        def get_results(self):
+            return self.results
 
-    def search(self, what, cat='all'):
-        query = str(what).replace(r' ', '+')
+    def retrieve_url(self, url, proxy_server_address):
+        response = requests.get(url, proxies={"http": proxy_server_address})
+        return response.text
+
+    def search_and_yield(self, what, cat='all', proxy_server_address=None, magnets_to_yield=10):
+        if proxy_server_address is None:
+            return
+        parser = self.TorrentGalaxyParser(self.url)
+        what = urllib.parse.quote(what)
+        result_count = 0
+
         search_url = 'https://torrentgalaxy.to/torrents.php?'
-        full_url = \
-            search_url + \
-            self.supported_categories[cat.lower()] + \
-            'sort=seeders&order=desc&search=' + \
-            query
-
-        webpage = retrieve_url(full_url)
-        tgParser = self.TorrentGalaxyParser()
-        tgParser.feed(webpage)
+        full_url = search_url + self.supported_categories[cat.lower()] + 'sort=seeders&order=desc&search=' + what
+        retrieved_html = self.retrieve_url(full_url, proxy_server_address)
+        parser.feed(retrieved_html)
 
         all_results_re = re.compile(r'steelblue[^>]+>(.*?)<')
-        all_results = all_results_re.findall(webpage)[0]
+        if len(all_results_re.findall(retrieved_html)) == 0:
+            return
+        all_results = all_results_re.findall(retrieved_html)[0]
         all_results = all_results.replace(' ', '')
         pages = math.ceil(int(all_results) / 50)
-        threads = []
-        for page in range(1, pages):
-            this_url = full_url + '&page=' + str(page)
-            t = threading.Thread(args=(this_url,), target=self.do_search)
-            threads.append(t)
-            t.start()
-            # self.do_search(this_url)
-        
-        for thread in threads:
-            thread.join()
 
-if __name__ == '__main__':
-    a = torrentgalaxy()
-    a.search('ncis new', 'all')
+        for page in range(1, pages + 1):
+            if result_count >= magnets_to_yield:
+                break
+            page_url = full_url + '&page=' + str(page)
+            retrieved_html = self.retrieve_url(page_url, proxy_server_address)
+            parser.feed(retrieved_html)
+            results = parser.get_results()
+            parser.results.clear()
+
+            if not results:
+                break
+
+            for result in results:
+                if result_count >= magnets_to_yield:
+                    break
+                yield {
+                    'name': result['name'],
+                    'size': result['size'],
+                    'seeders': result['seeds'],
+                    'leechers': result['leech'],
+                    'magnet': result['link']
+                }
+                result_count += 1
+
+        parser.close()

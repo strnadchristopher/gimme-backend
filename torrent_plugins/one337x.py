@@ -1,33 +1,12 @@
-# VERSION: 2.2
-# AUTHORS: sa3dany, Alyetama, BurningMop, scadams
-
-# LICENSING INFORMATION
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
+import urllib.parse
+import json
+import requests
 import re
 from html.parser import HTMLParser
-
-from helpers import download_file, retrieve_url
-from novaprinter import prettyPrinter
+from prettyprinter import pprint
 
 
-class one337x(object):
+class one337x:
     url = 'https://1337x.to'
     name = '1337x'
     supported_categories = {
@@ -61,6 +40,7 @@ class one337x(object):
                 'leech': 'leeches',
                 'size': 'size'
             }
+            self.results = []
 
         def handle_starttag(self, tag, attrs):
             params = dict(attrs)
@@ -87,7 +67,7 @@ class one337x(object):
                 link = params[self.HREF]
                 if link.startswith('/torrent/'):
                     link = f'{self.url}{link}'
-                    torrent_page = retrieve_url(link)
+                    torrent_page = requests.get(link).text
                     magnet_regex = r'href="magnet:.*"'
                     matches = re.finditer(magnet_regex, torrent_page, re.MULTILINE)
                     magnet_urls = [x.group() for x in matches]
@@ -110,23 +90,43 @@ class one337x(object):
                 self.column = None
                 if not self.row:
                     return
-                prettyPrinter(self.row)
+                self.results.append(self.row)
                 self.row = {}
 
-    def download_torrent(self, info):
-        print(download_file(info))
+    def retrieve_url(self, url, proxy_server_address):
+        response = requests.get(url, proxies={"http": proxy_server_address})
+        return response.text
 
-    def search(self, what, cat='all'):
+    def search_and_yield(self, what, cat='all', proxy_server_address=None, magnets_to_yield=10):
+        if proxy_server_address is None:
+            return
         parser = self.MyHtmlParser(self.url)
         what = what.replace('%20', '+')
         category = self.supported_categories[cat]
         page = 1
-        while True:
+        result_count = 0
+
+        while result_count < magnets_to_yield:
             page_url = f'{self.url}/category-search/{what}/{category}/{page}/' if category else f'{self.url}/search/{what}/{page}/'
-            html = retrieve_url(page_url)
+            html = self.retrieve_url(page_url, proxy_server_address)
             parser.feed(html)
             if html.find('<li class="last">') == -1:
                 # exists on every page but the last
                 break
+            for result in parser.results:
+                if result_count >= magnets_to_yield:
+                    break
+                print(f"Found {result['name']}, Source: 1337x")
+                yield {
+                    'name': result['name'],
+                    'size': result['size'],
+                    'seeders': result['seeds'],
+                    'leechers': result['leech'],
+                    'magnet': result['link'],
+                    'source' : "1337x"
+                }
+                result_count += 1
+            parser.results.clear()
             page += 1
+
         parser.close()

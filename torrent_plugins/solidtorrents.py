@@ -1,34 +1,11 @@
-# VERSION: 1.0
-# AUTHORS: BurningMop (burning.mop@yandex.com)
-
-# LICENSING INFORMATION
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
 import math
 import re
+import urllib.parse
+import requests
 from html.parser import HTMLParser
+from prettyprinter import pprint
 
-from helpers import download_file, retrieve_url
-from novaprinter import prettyPrinter, anySizeToBytes
-
-
-class solidtorrents(object):
+class solidtorrents:
     url = 'https://solidtorrents.to'
     name = 'Solid Torrents'
     supported_categories = {
@@ -60,7 +37,8 @@ class solidtorrents(object):
             self.insideStatsDiv = False
             self.insideStatsColumn = False
             self.insideLinksDiv = False
-    
+            self.results = []
+
         def handle_starttag(self, tag, attrs):
             params = dict(attrs)
             cssClasses = params.get('class', '')
@@ -136,40 +114,62 @@ class solidtorrents(object):
 
             if tag == self.LI and self.insideSearchResult:
                 self.row['engine_url'] = self.url
-                print(self.row)
-                prettyPrinter(self.row)
+                if self.row.get('name') and self.row.get('link'):
+                    self.results.append(self.row)
                 self.insideSearchResult = False
                 self.column = 0
-                return
+                self.row = {}
 
-    def download_torrent(self, info):
-        print(download_file(info))
+    def retrieve_url(self, url, proxy_server_address):
+        response = requests.get(url, proxies={"http": proxy_server_address})
+        return response.text
 
-    def search(self, what, cat='all'):
+    def search_and_yield(self, what, cat='all', proxy_server_address=None, magnets_to_yield=10):
+        if proxy_server_address is None:
+            return
         parser = self.MyHtmlParser(self.url)
         what = what.replace('%20', '+')
         what = what.replace(' ', '+')
         page = 1
+        result_count = 0
 
-        page_url = f'{self.url}/search?q={what}&page={page}'
-        retrievedHtml = retrieve_url(page_url)
-        results_matches = re.finditer(self.results_regex, retrievedHtml, re.MULTILINE)
-        results_array = [x.group() for x in results_matches]
- 
-        if len(results_array) > 0:
-            results = int(results_array[0].replace('<b>', '').replace('</b>', ''))
-            pages = math.ceil(results / 20)
-        else:
-            pages = 0
+        while result_count < magnets_to_yield:
+            page_url = f'{self.url}/search?q={what}&page={page}'
+            retrieved_html = self.retrieve_url(page_url, proxy_server_address)
+            results_matches = re.finditer(self.results_regex, retrieved_html, re.MULTILINE)
+            results_array = [x.group() for x in results_matches]
+    
+            if len(results_array) > 0:
+                results = int(results_array[0].replace('<b>', '').replace('</b>', ''))
+                pages = math.ceil(results / 20)
+            else:
+                pages = 0
 
-        page += 1
+            page += 1
 
-        if pages > 0:
-            parser.feed(retrievedHtml)
+            if pages > 0:
+                parser.feed(retrieved_html)
 
-            while page <= pages:
-                page_url = f'{self.url}/search?q={what}&page={page}'
-                retrievedHtml = retrieve_url(page_url)
-                parser.feed(retrievedHtml)
-                page += 1
+                while page <= pages:
+                    page_url = f'{self.url}/search?q={what}&page={page}'
+                    retrieved_html = self.retrieve_url(page_url, proxy_server_address)
+                    parser.feed(retrieved_html)
+                    for result in parser.results:
+                        if result_count >= magnets_to_yield:
+                            break
+                        yield {
+                            'name': result['name'],
+                            'size': result['size'],
+                            'seeders': result['seeds'],
+                            'leechers': result['leech'],
+                            'magnet': result['link'],
+                            'source' : 'Solid Torrents'
+                        }
+                        result_count += 1
+                    parser.results.clear()
+                    page += 1
+
+            if result_count >= magnets_to_yield:
+                break
+
         parser.close()

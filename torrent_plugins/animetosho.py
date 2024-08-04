@@ -1,59 +1,42 @@
-# VERSION: 1.00
-# AUTHORS: ALAA_BRAHIM
-# LICENSING INFORMATION
-
-#  This program is free software: you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation, either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 from html.parser import HTMLParser
 import requests
-from prettyprinter import pprint
+import urllib.parse
 
-
-class animetosho(object):
+class animetosho:
     url = "https://animetosho.org"
     name = "Anime Tosho"
     supported_categories = {
         "all": [""]
     }
 
-    def __init__(self):
-        pass
+    def retrieve_url(self, url, proxy):
+        response = requests.get(url, proxies={"http": proxy, "https": proxy})
+        return response.text
 
-    def download_torrent(self, info):
-        print(download_file(info))
-
-    def search(self, what, cat='all'):
-        results = []
+    def search_and_yield(self, what, cat='all', proxy=None, magnets_to_yield=10):
+        results_count = 0
         for page in range(1, 10):
             url = f"https://animetosho.org/search?q={what}&page={page}"
             try:
-                data = requests.get(url)
+                html = self.retrieve_url(url, proxy)
                 parser = self.DataExtractor()
-                parser.feed(data)
+                parser.feed(html)
                 results = parser.get_results()
-                parser.close()
                 if len(results) == 0:
                     break
-            except Exception:
+            except Exception as e:
+                print(f"Error fetching data from Anime Tosho: {e}")
                 break
-            for result in results[::-1]:
-                pprint(result)
+            for result in results:
+                yield result
+                results_count += 1
+                if results_count >= magnets_to_yield:
+                    return
 
     class DataExtractor(HTMLParser):
         def __init__(self):
             super().__init__()
-            self.in_corret_tag = False
+            self.in_correct_tag = False
             self.found_size = False
             self.found_name = False
             self.save_name_data = False
@@ -66,11 +49,10 @@ class animetosho(object):
             for attr in attrs:
                 attribute = attr[0]
                 attribute_values = attr[1].split()
-                if attribute == 'class' and "home_list_entry" in attribute_values\
-                        and "home_list_entry_compl_1" in attribute_values:
-                    self.in_corret_tag = True
+                if attribute == 'class' and "home_list_entry" in attribute_values and "home_list_entry_compl_1" in attribute_values:
+                    self.in_correct_tag = True
 
-                if self.in_corret_tag:
+                if self.in_correct_tag:
                     if attribute == 'class' and "size" in attribute_values:
                         self.found_size = True
 
@@ -106,8 +88,9 @@ class animetosho(object):
                                 seeds, leech = attr[1].split("/")
                                 seeds = seeds.split(": ")[1].strip()
                                 leech = leech.split(": ")[1].strip()
-                                self.current_result["seeds"] = seeds
-                                self.current_result["leech"] = leech
+                                self.current_result["seeders"] = seeds
+                                self.current_result["leechers"] = leech
+                    self.current_result["source"] = "Anime Tosho"
 
                     self.check_current_result_completed()
 
@@ -117,15 +100,15 @@ class animetosho(object):
                 self.save_name_data = False
 
         def check_current_result_completed(self):
-            if len(self.current_result) == 7:
+            if 'name' in self.current_result and 'link' in self.current_result:
                 self.results.append(self.current_result)
                 self.current_result = {"engine_url": "https://animetosho.org/"}
-                self.in_corret_tag = False
+                self.in_correct_tag = False
 
         def get_results(self):
             return self.results
 
-
 if __name__ == "__main__":
     a = animetosho()
-    a.search("zom+judas")
+    for result in a.search_and_yield("zom+judas"):
+        print(result)

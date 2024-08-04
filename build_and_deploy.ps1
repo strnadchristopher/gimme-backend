@@ -1,7 +1,3 @@
-# Power shell script to deploy the app
-# No need to build it, so we just copy everything in this directory, except for the script itself, to the deployment directory
-# The deployment location is christopher@192.168.1.217:/home/christopher/gimme/backend
-
 # PowerShell script to deploy the app
 
 # Define variables
@@ -14,8 +10,11 @@ $deployLocation = "$deployUser@${deployHost}:$deployPath"
 # Exclude the script file itself
 $scriptName = $MyInvocation.MyCommand.Name
 
-# Get the list of files to copy, excluding the script itself
-$filesToCopy = Get-ChildItem -Path $sourceDirectory -Recurse | Where-Object { $_.Name -ne $scriptName }
+# Get the list of files to copy, excluding the script itself and folders other than 'torrent_plugins'
+$filesToCopy = Get-ChildItem -Path $sourceDirectory -Recurse | Where-Object {
+    $_.Name -ne $scriptName -and
+    ($_.PSIsContainer -eq $false -or $_.FullName -like "*torrent_plugins*")
+}
 
 # Deploy the files using SCP
 foreach ($file in $filesToCopy) {
